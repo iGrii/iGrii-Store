@@ -4,26 +4,32 @@ const cors = require("cors");
 const mysql = require("mysql2/promise");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
+const path = require("path"); // <== IMPORTANTE para servir tu frontend
 
 const app = express();
+
+// ====== CONFIGURACIÓN CORS ======
 app.use(cors({
-  origin: ['http://localhost:5500', 'https://igrii-store.onrender.com'], // ← agrega tus dominios
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  origin: [
+    "http://localhost:5500", 
+    "http://127.0.0.1:5500",
+    "https://igrii-store.onrender.com"
+  ],
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true
 }));
 
 app.use(express.json());
 
-// ----- CONFIG -----
-const PORT = 3000;
+// ----- CONFIGURACIÓN BASE DE DATOS -----
+const PORT = process.env.PORT || 3000;
 const JWT_SECRET = "missecretito_cámbialo_por_algo_seguro"; // cambia en producción
 
-// Ajusta las credenciales MySQL a las tuyas:
 const pool = mysql.createPool({
   host: "localhost",
   user: "root",
-  password: "",     // <- pon tu contraseña si tienes
+  password: "", // <- pon tu contraseña si tienes
   database: "tienda",
   waitForConnections: true,
   connectionLimit: 10,
@@ -46,7 +52,7 @@ function verifyTokenMiddleware(req, res, next) {
   }
 }
 
-// (Opcional) middleware que exige rol admin
+// Middleware que exige rol admin
 function requireAdmin(req, res, next) {
   if (!req.user || req.user.role !== "admin") {
     return res.status(403).json({ error: "Se requiere rol admin" });
@@ -54,9 +60,7 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-// =================== RUTAS PÚBLICAS (GET) ===================
-
-// Categorías
+// =================== RUTAS PÚBLICAS ===================
 app.get("/categorias", async (req, res) => {
   try {
     const [rows] = await pool.query("SELECT * FROM categorias");
@@ -67,7 +71,6 @@ app.get("/categorias", async (req, res) => {
   }
 });
 
-// Productos (incluye categoria nombre)
 app.get("/productos", async (req, res) => {
   try {
     const [rows] = await pool.query(`
@@ -82,7 +85,6 @@ app.get("/productos", async (req, res) => {
   }
 });
 
-// Imágenes por producto
 app.get("/imagenes/:producto_id", async (req, res) => {
   try {
     const { producto_id } = req.params;
@@ -97,11 +99,7 @@ app.get("/imagenes/:producto_id", async (req, res) => {
   }
 });
 
-// =================== RUTAS PROTEGIDAS (CREAR / BORRAR) ===================
-// Usan verifyTokenMiddleware para exigir token válido.
-// Además requireAdmin para acciones sólo admin (opcional pero recomendable).
-
-// Crear categoría (admin)
+// =================== RUTAS PROTEGIDAS ===================
 app.post("/categorias", verifyTokenMiddleware, requireAdmin, async (req, res) => {
   try {
     const { nombre } = req.body;
@@ -113,7 +111,6 @@ app.post("/categorias", verifyTokenMiddleware, requireAdmin, async (req, res) =>
   }
 });
 
-// Eliminar categoría (admin)
 app.delete("/categorias/:id", verifyTokenMiddleware, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
@@ -125,7 +122,6 @@ app.delete("/categorias/:id", verifyTokenMiddleware, requireAdmin, async (req, r
   }
 });
 
-// Crear producto (admin)
 app.post("/productos", verifyTokenMiddleware, requireAdmin, async (req, res) => {
   try {
     const { nombre, precio, categoria_id } = req.body;
@@ -140,7 +136,6 @@ app.post("/productos", verifyTokenMiddleware, requireAdmin, async (req, res) => 
   }
 });
 
-// Eliminar producto (admin)
 app.delete("/productos/:id", verifyTokenMiddleware, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
@@ -152,7 +147,6 @@ app.delete("/productos/:id", verifyTokenMiddleware, requireAdmin, async (req, re
   }
 });
 
-// Crear imagen (admin)
 app.post("/imagenes", verifyTokenMiddleware, requireAdmin, async (req, res) => {
   try {
     const { url, producto_id } = req.body;
@@ -167,7 +161,6 @@ app.post("/imagenes", verifyTokenMiddleware, requireAdmin, async (req, res) => {
   }
 });
 
-// Eliminar imagen (admin)
 app.delete("/imagenes/:id", verifyTokenMiddleware, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
@@ -180,14 +173,11 @@ app.delete("/imagenes/:id", verifyTokenMiddleware, requireAdmin, async (req, res
 });
 
 // =================== AUTENTICACIÓN ===================
-
-// Registro (puedes crear admin desde aquí seleccionando role = "admin")
 app.post("/auth/register", async (req, res) => {
   try {
     const { nombre, email, password, role } = req.body;
     if (!nombre || !email || !password) return res.status(400).json({ error: "Faltan datos" });
 
-    // Verificar si ya existe
     const [existing] = await pool.query("SELECT id FROM usuarios WHERE email = ?", [email]);
     if (existing.length > 0) return res.status(400).json({ error: "Email ya registrado" });
 
@@ -203,7 +193,6 @@ app.post("/auth/register", async (req, res) => {
   }
 });
 
-// Login -> devuelve token
 app.post("/auth/login", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -226,7 +215,6 @@ app.post("/auth/login", async (req, res) => {
   }
 });
 
-// Verificar token (devuelve valid: true/false y user si es válido)
 app.get("/auth/verify", (req, res) => {
   const auth = req.headers["authorization"];
   if (!auth) return res.json({ valid: false });
@@ -242,8 +230,15 @@ app.get("/auth/verify", (req, res) => {
   }
 });
 
-// =================== INICIAR SERVIDOR ===================
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
+// =================== SERVIR FRONTEND ===================
+// Asegúrate de tener una carpeta llamada "frontend" con tu index.html
+app.use(express.static(path.join(__dirname, "frontend")));
+
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "frontend", "index.html"));
 });
 
+// =================== INICIAR SERVIDOR ===================
+app.listen(PORT, () => {
+  console.log(`Servidor corriendo en puerto ${PORT}`);
+});
