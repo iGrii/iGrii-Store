@@ -7,7 +7,7 @@ const bcrypt = require("bcryptjs");
 
 const app = express();
 app.use(cors({
-  origin: ['http://localhost:5500', 'https://mitienda.com'], // ← agrega tus dominios
+  origin: ['http://localhost:5500', 'https://igrii-store.onrender.com'], // ← agrega tus dominios
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
