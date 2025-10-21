@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Detalle del producto - Mi Tienda</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <div class="container">
+    <a class="navbar-brand" href="index.html">Mi Tienda</a>
+  </div>
+</nav>
+
+<div class="container mt-4">
+  <div id="detalle"></div>
+  <hr>
+  <h4>Imágenes</h4>
+  <div class="row" id="imagenes"></div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const id = urlParams.get("id");
+
+  if (!id) {
+    document.getElementById("detalle").innerHTML = "<p class='text-danger'>Producto no encontrado</p>";
+    return;
+  }
+
+  const productos = await getProductos();
+  const producto = productos.find(p => p.id == id);
+
+  if (!producto) {
+    document.getElementById("detalle").innerHTML = "<p class='text-danger'>Producto no existe</p>";
+    return;
+  }
+
+  document.getElementById("detalle").innerHTML = `
+    <h2>${producto.nombre}</h2>
+    <p class="text-muted">Precio: $${producto.precio}</p>
+    <p class="text-muted">Categoría: ${producto.categoria || 'Sin categoría'}</p>
+  `;
+
+  const imagenes = await getImagenes(id);
+  const contenedor = document.getElementById("imagenes");
+  if (imagenes.length === 0) {
+    contenedor.innerHTML = "<p>No hay imágenes para este producto.</p>";
+    return;
+  }
+  imagenes.forEach(img => {
+    const col = document.createElement("div");
+    col.className = "col-md-4 mb-3";
+    col.innerHTML = `<img src="${img.url}" class="img-fluid rounded shadow-sm">`;
+    contenedor.appendChild(col);
+  });
+});
+</script>
+</body>
+</html>
+
+

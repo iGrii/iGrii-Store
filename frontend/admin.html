@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Panel Admin - Mi Tienda</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<!-- NAVBAR -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <div class="container">
+    <a class="navbar-brand">Panel Admin</a>
+    <div>
+      <button id="btnLogout" class="btn btn-outline-light btn-sm">Cerrar sesión</button>
+    </div>
+  </div>
+</nav>
+
+<div class="container mt-4">
+  <!-- Botones CRUD -->
+  <div class="d-flex gap-2 mb-3">
+    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalCategoria">+ Categoría</button>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalProducto">+ Producto</button>
+    <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#modalImagen">+ Imagen</button>
+  </div>
+
+  <h3>Productos</h3>
+  <div class="row" id="lista-productos"></div>
+
+  <hr class="my-4">
+
+  <h3>Categorías</h3>
+  <div id="lista-categorias" class="mb-4"></div>
+</div>
+
+<!-- ================== MODALES ================== -->
+<div class="modal fade" id="modalCategoria" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5>Nueva Categoría</h5></div>
+    <div class="modal-body"><input id="nombreCategoria" class="form-control" placeholder="Nombre"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+      <button id="btnGuardarCategoria" class="btn btn-success">Guardar</button>
+    </div>
+  </div></div>
+</div>
+
+<div class="modal fade" id="modalProducto" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5>Nuevo Producto</h5></div>
+    <div class="modal-body">
+      <input id="nombreProducto" class="form-control mb-2" placeholder="Nombre producto">
+      <input id="precioProducto" type="number" class="form-control mb-2" placeholder="Precio">
+      <select id="categoriaProducto" class="form-control"></select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+      <button id="btnGuardarProducto" class="btn btn-primary">Guardar</button>
+    </div>
+  </div></div>
+</div>
+
+<div class="modal fade" id="modalImagen" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5>Nueva Imagen</h5></div>
+    <div class="modal-body">
+      <input id="urlImagen" class="form-control mb-2" placeholder="URL">
+      <select id="productoImagen" class="form-control"></select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+      <button id="btnGuardarImagen" class="btn btn-warning">Guardar</button>
+    </div>
+  </div></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="js/api_admin.js"></script>
+<script>
+(async function () {
+  // ================== PROTECCIÓN ==================
+  const v = await verifyToken();
+  if (!v.valid || v.user.role !== 'admin') {
+    localStorage.removeItem('token');  // limpiar token inválido
+    window.location = 'login.html';    // redirigir
+    return;
+  }
+
+  // ================== EVENTO LOGOUT ==================
+  document.getElementById('btnLogout').addEventListener('click', () => {
+    localStorage.removeItem('token');
+    window.location = 'login.html';
+  });
+
+  const listaProductos = document.getElementById('lista-productos');
+  const listaCategorias = document.getElementById('lista-categorias');
+
+  // ================== CARGAR CATEGORÍAS ==================
+  async function cargarCategorias() {
+    const cats = await getCategorias();
+    const sel = document.getElementById('categoriaProducto');
+    sel.innerHTML = '';
+    cats.forEach(c => sel.innerHTML += `<option value="${c.id}">${c.nombre}</option>`);
+
+    listaCategorias.innerHTML = '';
+    cats.forEach(c => {
+      const div = document.createElement('div');
+      div.className = 'd-flex justify-content-between align-items-center border p-2 rounded bg-white mb-2';
+      div.innerHTML = `<span>${c.nombre}</span><button class="btn btn-sm btn-danger">Eliminar</button>`;
+      div.querySelector('button').addEventListener('click', async () => {
+        if (confirm('¿Eliminar categoría?')) {
+          await eliminarCategoria(c.id);
+          await cargarCategorias(); await cargarProductos();
+        }
+      });
+      listaCategorias.appendChild(div);
+    });
+  }
+
+  // ================== CARGAR PRODUCTOS ==================
+  async function cargarProductos() {
+    const prods = await getProductos();
+    listaProductos.innerHTML = '';
+    for (let p of prods) {
+      const imgs = await getImagenes(p.id);
+      const img = imgs.length ? imgs[0].url : 'https://via.placeholder.com/200';
+      const col = document.createElement('div');
+      col.className = 'col-md-3 mb-4';
+      col.innerHTML = `
+        <div class="card h-100 shadow-sm">
+          <img src="${img}" class="card-img-top" style="height:180px; object-fit:cover;">
+          <div class="card-body d-flex flex-column">
+            <h5>${p.nombre}</h5>
+            <p class="text-muted">$${p.precio}</p>
+            <div class="mt-auto d-flex justify-content-between">
+              <a href="detalle.html?id=${p.id}" class="btn btn-sm btn-primary">Ver</a>
+              <button class="btn btn-sm btn-danger">Eliminar</button>
+            </div>
+          </div>
+        </div>`;
+      col.querySelector('button').addEventListener('click', async () => {
+        if (confirm('¿Eliminar producto?')) {
+          await eliminarProducto(p.id);
+          await cargarProductos();
+        }
+      });
+      listaProductos.appendChild(col);
+    }
+    // llenar select productos en modal imagen
+    const sel = document.getElementById('productoImagen');
+    sel.innerHTML = '';
+    prods.forEach(p => sel.innerHTML += `<option value="${p.id}">${p.nombre}</option>`);
+  }
+
+  // ================== BOTONES GUARDAR ==================
+  document.getElementById('btnGuardarCategoria').addEventListener('click', async () => {
+    const nombre = document.getElementById('nombreCategoria').value.trim();
+    if (!nombre) return alert('Escribe un nombre');
+    await crearCategoria(nombre);
+    await cargarCategorias();
+    document.getElementById('nombreCategoria').value = '';
+    bootstrap.Modal.getInstance(document.getElementById('modalCategoria')).hide();
+  });
+
+  document.getElementById('btnGuardarProducto').addEventListener('click', async () => {
+    const nombre = document.getElementById('nombreProducto').value;
+    const precio = document.getElementById('precioProducto').value;
+    const categoria_id = document.getElementById('categoriaProducto').value;
+    if (!nombre || !precio) return alert('Completa todos los campos');
+    await crearProducto(nombre, precio, categoria_id);
+    await cargarProductos();
+    document.getElementById('nombreProducto').value = '';
+    document.getElementById('precioProducto').value = '';
+    bootstrap.Modal.getInstance(document.getElementById('modalProducto')).hide();
+  });
+
+  document.getElementById('btnGuardarImagen').addEventListener('click', async () => {
+    const url = document.getElementById('urlImagen').value;
+    const producto_id = document.getElementById('productoImagen').value;
+    if (!url) return alert('Escribe la URL');
+    await crearImagen(url, producto_id);
+    await cargarProductos();
+    document.getElementById('urlImagen').value = '';
+    bootstrap.Modal.getInstance(document.getElementById('modalImagen')).hide();
+  });
+
+  // ================== INICIALIZAR ==================
+  await cargarCategorias();
+  await cargarProductos();
+})();
+</script>
+</body>
+</html>
+
